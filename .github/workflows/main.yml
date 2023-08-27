@@ -1,46 +1,38 @@
 name: CI
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - main  # Adjust the branch name as needed
+  workflow_dispatch:
 
 jobs:
-build:
+  build:
+    runs-on: windows-latest
 
-runs-on: windows-latest
+    steps:
+      - name: Download Ngrok
+        run: Invoke-WebRequest -Uri "https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip" -OutFile ngrok.zip
 
-steps:
-- name: Download
+      - name: Extract Ngrok
+        run: Expand-Archive ngrok.zip
 
-run: Invoke-WebRequest
+      - name: Authenticate Ngrok
+        run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-
-amd64.zip -OutFile ngrok.zip
+      - name: Enable TS Connections
+        run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
 
-- name: Extract
+      - name: Enable Remote Desktop Firewall Rule
+        run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-run: Expand-Archive ngrok.zip
-- name: Auth
+      - name: Enable User Authentication
+        run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
 
-run: .\ngrok\ngrok.exe authtoken
-$Env:NGROK_AUTH_TOKEN
+      - name: Set Local User Password
+        run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
 
-env:
-NGROK_AUTH_TOKEN: ${{
-secrets.NGROK_AUTH_TOKEN }}
-
-- name: Enable TS
-
-run: Set-ItemProperty -Path
-'HKLM:\System\CurrentControlSet\Control\Terminal Server'-
-name "fDenyTSConnections" -Value 0
-- run: Enable-NetFirewallRule -DisplayGroup "Remote
-Desktop"
-- run: Set-ItemProperty -Path
-'HKLM:\System\CurrentControlSet\Control\Terminal
-Server\WinStations\RDP-Tcp' -name "UserAuthentication" -
-Value 1
-
-- run: Set-LocalUser -Name "runneradmin" -Password
-(ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
-- name: Create Tunnel
-
-run: .\ngrok\ngrok.exe tcp 3389
+      - name: Create Ngrok Tunnel
+        run: .\ngrok\ngrok.exe tcp 3389
